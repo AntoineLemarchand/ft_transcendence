@@ -4,17 +4,27 @@ import {useNavigate} from 'react-router-dom';
 import { useCookies } from 'react-cookie';
 
 import 'static/Account/Prompt.scss'
+import { URLEncodedUTF8 } from "../../utils/Url";
 
 import {ReactComponent as SchoolLogo} from 'static/logo.svg'
 
 function Login() {
-
     const navigate = useNavigate();
     const [cookie, setCookie] = useCookies(['auth', 'userInfo']);
     const [state, setState] = useState({
         username: '',
         password: '',
     });
+
+	// replace with env var
+	const oauth_params = {
+		'client_id': 'u-s4t2ud-e02be92b029c1c51dd3a1df387a8a8a8deccd570cbeab4258b75ecd553e2295a',
+		'redirect_uri': 'http%3A%2F%2Flocalhost%3A3001%2Fhome',
+		'state': (Math.random() + 3).toString(36),
+		'response_type': 'code'
+		};
+
+	const oauth_uri = URLEncodedUTF8('https://api.intra.42.fr/oauth/authorize?', oauth_params);
 
     useEffect(() => {
 			if (cookie['auth'] !== undefined)
@@ -49,7 +59,6 @@ function Login() {
     }
 
     const ProcessOauth = () => {
-        navigate('/home');
     }
 
     const UpdatePassword = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,8 +86,10 @@ function Login() {
                 <button className="signin"
                         onClick={ProcessSignIn}>Sign in
                 </button>
+				<a href={oauth_uri}>
                 <button className="Oauth"
                         onClick={ProcessOauth}><SchoolLogo/></button>
+				</a>
             </div>
         </div>
     )
