@@ -1,23 +1,18 @@
 import { Test } from '@nestjs/testing';
-import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
-import { User } from '../user/user.entities';
+import { User } from './user.entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { setupDataSource } from '../test.databaseFake.utils';
-import { Channel } from '../channel/channel.entities';
-import { ChannelService } from '../channel/channel.service';
-import { UserRepository } from '../channel/channel.repository.mock';
 import { UserService } from './user.service';
 import { ChannelModule } from '../channel/channel.module';
 import { INestApplication } from '@nestjs/common';
+import { Channel } from '../channel/channel.entities';
+import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
 
 jest.spyOn(Channel.prototype, 'addMessage');
 jest.spyOn(BroadcastingGateway.prototype, 'emitMessage');
 jest.mock('../broadcasting/broadcasting.gateway');
 
-let channelService: ChannelService;
-let userRepository: Repository<User>;
-let broadcasting: BroadcastingGateway;
 let userService: UserService;
 let dataSource: DataSource;
 let app: INestApplication;
@@ -31,20 +26,65 @@ beforeEach(async () => {
     .useValue(dataSource.getRepository(User))
     .compile();
   app = module.createNestApplication();
-  channelService = app.get<ChannelService>(ChannelService);
-  broadcasting = app.get<BroadcastingGateway>(BroadcastingGateway);
   userService = app.get<UserService>(UserService);
-  userRepository = app.get<Repository<User>>(getRepositoryToken(User));
   await app.init();
+  await userService.createUser(new User('Thomas', 'test'));
 });
 
+
+
 describe('creating a user', () => {
-  it('should increase the user count', async () => {
+  it('should increment the user count', async () => {
     const countBefore = (await userService.getAllUsernames()).length;
 
     await userService.createUser(new User('newUserName', 'newUserPassword'));
 
     const countAfter = (await userService.getAllUsernames()).length;
     expect(countAfter).toEqual(countBefore + 1);
+  });
+});
+
+describe('deleting a user', () => {
+  beforeEach(async () => {
+    await userService.createUser(new User('newUserName', 'newUserPassword'));
+  });
+
+  it('should decrement the user count', async () => {
+    const countBefore = (await userService.getAllUsernames()).length;
+
+    await userService.deleteUser('newUserName');
+
+    const countAfter = (await userService.getAllUsernames()).length;
+    expect(countAfter).toEqual(countBefore - 1);
+  });
+});
+
+describe('making friends', () => {
+  beforeEach(async () => {
+    await userService.createUser(new User('executing user', 'password'));
+    await userService.createUser(new User('target user', 'password'));
+  });
+
+  it('should decrement the user count', async () => {
+    await userService.addFriend('executing user', 'target user');
+
+    const friends = (await userService.getUser('executing user'))?.friends;
+    expect(friends?.includes('target user')).toBeTruthy();
+  });
+});
+
+describe('getting users by name', () => {
+  it('should return undefined on not found', async () => {
+    await userService.createUser(new User('executing user', 'password'));
+
+    const user = await userService.getUser('nonexisting user');
+    expect(user).toBeUndefined();
+  });
+
+  it('should return user', async () => {
+    await userService.createUser(new User('executing user', 'password'));
+
+    const user = await userService.getUser('executing user');
+    expect(user).toBeDefined();
   });
 });

@@ -23,7 +23,7 @@ export class AuthService {
   ) {}
 
   async validateUser(username: string, password: string): Promise<User> {
-    const user = this.userService.getUser(username);
+    const user = await this.userService.getUser(username);
 
     if (user !== undefined) {
       if (user.getPassword() === password) return user;
@@ -48,7 +48,7 @@ export class AuthService {
         'no underscores in usernames',
         HttpStatus.FORBIDDEN,
       );
-    this.userService.createUser(
+    await this.userService.createUser(
       new User(userCandidate.username, userCandidate.password),
     );
     return this.login(new Identity(userCandidate.username, 1));

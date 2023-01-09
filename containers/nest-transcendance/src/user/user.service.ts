@@ -14,66 +14,56 @@ export class UserService {
 		@Inject(forwardRef(() => ChannelService))
 		private channelService: ChannelService,
     @InjectRepository(User) private readonly userRepository: Repository<User>)
-{
-		this.users = [new User('Thomas', 'test')]
-	}
+{}
 
-  getUser(name: string): User | undefined {
-    for (const user of this.users) {
-      if (user.getName() === name)
-        return user;
-    }
-		return undefined;
+  async getUser(name: string): Promise<User | undefined> {
+    const test = await this.userRepository.findOneBy({ name: name });
+    if (test)
+    return test;
   }
 
   async createUser(user: User) {
-    this.users.push(user);
     await this.userRepository.save(user);
   }
 
-  deleteUser(name: string) {
-    const toDelete: User | undefined = this.users.find(
-      (user) => user.getName() == name
-    );
-    if (toDelete == undefined)
+  async deleteUser(name: string) {
+    const toDelete: User | undefined = await this.getUser(name);
+    if (toDelete === undefined)
       throw new Error('User does not exist');
-    const userIndex: number = this.users.indexOf(toDelete);
-    this.users.splice(userIndex, 1);
+    await this.userRepository.remove(toDelete);
   }
 
-	addFriend(username: string, friendname: string){
-		const friend = this.getUser(friendname);
-		if (friend === undefined)
-			throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
-		try {
-			(this.getUser(username) as User).addFriend(friendname);
-		} catch (e) {
-			throw new HttpException('is already a friend', HttpStatus.UNAUTHORIZED)
-		}
-	}
+	async addFriend(username: string, friendname: string) {
+    const executingUser = await this.getUser(username) as User;
+    const friend = await this.getUser(friendname);
+    if (friend === undefined)
+      throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
+    try {
+      executingUser.addFriend(friendname);
+      await this.userRepository.save(executingUser);
+    } catch (e) {
+      throw new HttpException('is already a friend', HttpStatus.UNAUTHORIZED)
+    }
+  }
 
-	removeFriend(username: string, friendname: string){
-		try{
-			(this.getUser(username) as User).removeFriend(friendname);
-		} catch (e) {
-			throw new HttpException('not your friend', HttpStatus.NOT_FOUND)
-		}
-	}
+  async removeFriend(username: string, friendname: string) {
+    const user = await this.getUser(username) as User;
+    try {
+      user.removeFriend(friendname);
+      await this.userRepository.save(user);
 
-	getFriends(username: string){
-		const user = this.getUser(username) as User;
-		return user.getFriends();
-	}
+    } catch (e) {
+      throw new HttpException('not your friend', HttpStatus.NOT_FOUND)
+    }
+  }
 
-	getInfo(username: string) {
-		const user = this.getUser(username) as User;
-		if (user === undefined)
-			throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
-		return user;
-	}
+	async getFriends(username: string) {
+    const user = await this.getUser(username) as User;
+    return user.getFriends();
+  }
 
 	async getChannels(username: string) {
-		const user = this.getInfo(username);
+		const user = await this.getUser(username) as User;
 		const result: Channel[] = [];
 		for (const channelName of user.getChannelNames())
 			result.push(await this.channelService.getChannelByName(channelName));
@@ -81,16 +71,20 @@ export class UserService {
 	}
 
 	async addChannelName(username: string, channelName: string) {
-		const user: User = this.getInfo(username);
+		const user = await this.getUser(username);
+    if (user === undefined)
+      throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
 		if (user.getChannelNames().includes(channelName))
 			throw new HttpException('user has already joined the channel', HttpStatus.CONFLICT);
-		return user.addChannelName(channelName);
-	}
+		user.addChannelName(channelName);
+    await this.userRepository.save(user);
+  }
 
-	removeChannelName(username: string, channelName: string) {
-		const user: User = this.getInfo(username);
-		return user.removeChannelName(channelName);
-	}
+	async removeChannelName(username: string, channelName: string) {
+    const user: User = await this.getUser(username) as User;
+    user.removeChannelName(channelName);
+    await this.userRepository.save(user);
+  }
 
 	async getAllUsernames(){
     const userlist = await this.userRepository.find();
@@ -100,31 +94,34 @@ export class UserService {
 	async findMatching(regexSearchString: string): Promise<string[]> {
 			const result: string[] = [];
 
-			await this.users.forEach(async (value, key, map) => {
-			if (new RegExp(regexSearchString, 'g').test(await value.getName()))
-				result.push(value.getName());
-		});
-		return result;
-	}
-	
-  blockUser(username: string, userToBlock: string){
-		const user = this.getUser(userToBlock);
-		if (user === undefined)
-			throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
-		try {
-			(this.getUser(username) as User).blockUser(userToBlock);
-		} catch (e) {
-			throw new HttpException('is already blocked', HttpStatus.UNAUTHORIZED)
-		}
-	}
-	
-  getBlockedUsers(username: string){
-		const user = this.getUser(username) as User;
-		return user.getBlockedUsers();
+    for (const value of (await this.getAllUsernames())) {
+      const nameCandidate = await value.getName();
+      if (new RegExp(regexSearchString, 'g').test(nameCandidate))
+        result.push(nameCandidate);
+    }
+    return result;
 	}
 
-	unblockUser(username: string, userToUnblock: string){
-		(this.getUser(username) as User).unblockUser(userToUnblock);
-	}
+  async blockUser(username: string, userToBlock: string) {
+      const executingUser = await this.getUser(username) as User;
+      if (userToBlock === undefined)
+        throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
+      try {
+        executingUser.blockUser(userToBlock);
+        await this.userRepository.save(executingUser);
+      } catch (e) {
+        throw new HttpException('is already blocked', HttpStatus.UNAUTHORIZED)
+      }
+    }
+	
+  async getBlockedUsers(username: string) {
+    const user = await this.getUser(username) as User;
+    return user.getBlockedUsers();
+  }
 
+	async unblockUser(username: string, userToUnblock: string) {
+    const user = await this.getUser(username) as User
+    user.unblockUser(userToUnblock);
+    this.userRepository.save(user);
+  }
 }

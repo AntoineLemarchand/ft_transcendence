@@ -8,6 +8,7 @@ import { setupDataSource } from '../test.databaseFake.utils';
 import { User } from '../typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { createTestModule } from '../test.module.utils';
+import { UserService } from '../user/user.service';
 
 jest.mock('../broadcasting/broadcasting.gateway');
 
@@ -26,11 +27,14 @@ jest.mock('@nestjs/typeorm', () => {
 describe('AuthController', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let userService: UserService;
 
   beforeEach(async () => {
     dataSource = await setupDataSource();
     app = await createTestModule(dataSource);
     await app.init();
+    userService = app.get<UserService>(UserService);
+    await userService.createUser(new User('Thomas', 'test'));
   });
 
   // LOGIN
@@ -74,7 +78,7 @@ describe('AuthController', () => {
   });
 
   it('should return a token on login of a newly created user', async () => {
-    testUtils.signinUser(app, 'JayDee', 'yeah');
+    await testUtils.signinUser(app, 'JayDee', 'yeah');
     return testUtils.loginUser(app, 'JayDee', 'yeah').then((response) => {
       expect(response.status).toBe(201);
       expect(response.body.access_token).toBeDefined();

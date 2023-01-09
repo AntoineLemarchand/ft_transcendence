@@ -2,13 +2,13 @@ import { Test } from '@nestjs/testing';
 import { Channel, ChannelType, Message } from './channel.entities';
 import { ChannelService } from './channel.service';
 import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
-import { UserRepository } from './channel.repository.mock';
 import { UserService } from '../user/user.service';
 import { User } from '../user/user.entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { setupDataSource } from '../test.databaseFake.utils';
 import { ChannelModule } from './channel.module';
+import { UserRepository } from './channel.repository.mock';
 
 jest.spyOn(Channel.prototype, 'addMessage');
 jest.spyOn(BroadcastingGateway.prototype, 'emitMessage');
@@ -32,6 +32,7 @@ beforeEach(async () => {
   channelRepository = module.get<UserRepository>(UserRepository);
   broadcasting = module.get<BroadcastingGateway>(BroadcastingGateway);
   userService = module.get<UserService>(UserService);
+  await userService.createUser(new User('Thomas', 'test'));
 });
 
 function initChannelWithMessage() {
@@ -134,7 +135,7 @@ describe('direct messaging', () => {
     await channelService.createDirectMessageChannelFor('Thomas', 'HisFriend');
 
     expect(
-      (await userService.getUser('HisFriend'))
+      (await await userService.getUser('HisFriend'))
         ?.getChannelNames()
         .includes('Thomas_HisFriend'),
     ).toBeTruthy();
@@ -207,9 +208,9 @@ describe('Administrating a channel', () => {
       'channelName',
     );
 
-    expect(userService.getUser('bannedUserName')?.getChannelNames()).toEqual([
-      'welcome',
-    ]);
+    expect(
+      (await userService.getUser('bannedUserName'))?.getChannelNames(),
+    ).toEqual(['welcome']);
   });
 
   it('should not be allowed to ban unless admin', async () => {
@@ -233,8 +234,7 @@ describe('Administrating a channel', () => {
     );
 
     expect(
-      await userService
-        .getUser('randomUser')
+      await (await userService.getUser('randomUser'))
         ?.getChannelNames()
         .includes('privateChannel'),
     ).toBeTruthy();

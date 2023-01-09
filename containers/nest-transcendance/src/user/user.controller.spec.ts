@@ -27,11 +27,14 @@ jest.mock('@nestjs/typeorm', () => {
 
 let app: INestApplication;
 let dataSource: DataSource;
+let userService: UserService;
 
 beforeEach(async () => {
   dataSource = await setupDataSource();
   app = await createTestModule(dataSource);
   await app.init();
+  userService = app.get<UserService>(UserService);
+  await userService.createUser(new User('Thomas', 'test'));
 });
 
 describe('Making friends', () => {
@@ -45,7 +48,7 @@ describe('Making friends', () => {
 
   it('should return 401 on adding friend twice', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    testUtils.signinUser(app, 'JayDee', 'yeah');
+    await testUtils.signinUser(app, 'JayDee', 'yeah');
     await testUtils.addFriend(app, jwt, 'JayDee');
 
     const result = await testUtils.addFriend(app, jwt, 'JayDee');
@@ -57,7 +60,7 @@ describe('Making friends', () => {
 
   it('should return 201 and add friend', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    testUtils.signinUser(app, 'JayDee', 'yeah');
+    await testUtils.signinUser(app, 'JayDee', 'yeah');
 
     const result = await testUtils.addFriend(app, jwt, 'JayDee');
 
@@ -66,8 +69,8 @@ describe('Making friends', () => {
 
   it('should return 201 and a list of friends', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    testUtils.signinUser(app, 'JayDee', 'yeah');
-    testUtils.addFriend(app, jwt, 'JayDee');
+    await testUtils.signinUser(app, 'JayDee', 'yeah');
+    await testUtils.addFriend(app, jwt, 'JayDee');
 
     const result = await testUtils.getFriends(app, jwt);
 
@@ -78,7 +81,7 @@ describe('Making friends', () => {
 
   it('should return 404 when removing nonexistant friend', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    testUtils.signinUser(app, 'JayDee', 'yeah');
+    await testUtils.signinUser(app, 'JayDee', 'yeah');
     testUtils.addFriend(app, jwt, 'JayDee');
 
     const result = await testUtils.removeFriend(app, jwt, 'not my friend');
@@ -88,8 +91,8 @@ describe('Making friends', () => {
 
   it('should return 200 and remove friend', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    testUtils.signinUser(app, 'JayDee', 'yeah');
-    testUtils.addFriend(app, jwt, 'JayDee');
+    await testUtils.signinUser(app, 'JayDee', 'yeah');
+    await testUtils.addFriend(app, jwt, 'JayDee');
 
     const result = await testUtils.removeFriend(app, jwt, 'JayDee');
     const friendsList = (await testUtils.getFriends(app, jwt)).body.friends;
@@ -189,9 +192,10 @@ describe('Blocking users', () => {
   //beforeEach(async () => {
 
   //}
+
   it('should add user to the blockedUsers list', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    testUtils.signinUser(app, 'Martin', 'yeye');
+    await testUtils.signinUser(app, 'Martin', 'yeye');
 
     const result = await testUtils.blockUser(app, jwt, 'Martin');
     const blockedUsersList = (await testUtils.getBlockedUsers(app, jwt)).body
@@ -203,7 +207,7 @@ describe('Blocking users', () => {
 
   it('should remove user from the blockedUsers list', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    testUtils.signinUser(app, 'Martin', 'yeye');
+    await testUtils.signinUser(app, 'Martin', 'yeye');
 
     await testUtils.blockUser(app, jwt, 'Martin');
 

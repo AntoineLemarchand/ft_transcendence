@@ -118,7 +118,7 @@ export class ChannelService {
     if (channel.isAdmin(usernameOfExecutor) == false)
       throw new Error('This user is not an admin');
     channel.banUser(bannedUserName);
-    this.userService.removeChannelName(bannedUserName, channelName);
+    await this.userService.removeChannelName(bannedUserName, channelName);
   }
 
   async inviteToChannel(

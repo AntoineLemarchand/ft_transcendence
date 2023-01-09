@@ -7,6 +7,7 @@ import { ChannelService } from './channel.service';
 import { DataSource } from 'typeorm';
 import { setupDataSource } from '../test.databaseFake.utils';
 import { createTestModule } from '../test.module.utils';
+import { User } from '../user/user.entities';
 
 jest.mock('../broadcasting/broadcasting.gateway');
 jest.mock('@nestjs/typeorm', () => {
@@ -32,7 +33,9 @@ beforeEach(async () => {
   userService = app.get<UserService>(UserService);
   channelService = app.get<ChannelService>(ChannelService);
   await app.init();
+  await userService.createUser(new User('Thomas', 'test'));
 });
+
 
 describe('joining a channel', () => {
   it('should not be allowed to create a channel if the user is not logged in ', async () => {
@@ -305,8 +308,8 @@ describe('administrating a channel', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(userService.getUser('bannedUserName')?.getChannelNames()).toEqual([
-      'welcome',
-    ]);
+    expect(
+      (await userService.getUser('bannedUserName'))?.getChannelNames(),
+    ).toEqual(['welcome']);
   });
 });

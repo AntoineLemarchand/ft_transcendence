@@ -6,7 +6,7 @@ import {
   Post,
   Request,
   UseGuards,
-  Param
+  Param, HttpException, HttpStatus
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt.auth.guard';
@@ -19,33 +19,39 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Post('friend')
   async addFriend(@Request() req: any) {
-    this.userService.addFriend(req.user.name, req.body.username);
+    await this.userService.addFriend(req.user.name, req.body.username);
     return req.username + ' is now your friend';
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('friend')
   async getFriends(@Request() req: any) {
-    return { friends: this.userService.getFriends(req.user.name) };
+    return { friends: await this.userService.getFriends(req.user.name) };
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('friend')
   async removeFriend(@Request() req: any) {
-    this.userService.removeFriend(req.user.name, req.body.username);
+    await this.userService.removeFriend(req.user.name, req.body.username);
     return req.username + ' is no longer your friend';
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('info/:username')
   async getInfo(@Param('username') username: string) {
-    return { userInfo: this.userService.getInfo(username) };
+    const result = await this.userService.getUser(username);
+    if (result === undefined)
+      throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
+    return { userInfo:  result};
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('info')
   async getInfoAboutSelf(@Request() req: any) {
-    return { userInfo: this.userService.getInfo(req.user.name) };
+    const result = await this.userService.getUser(req.user.name);
+    if (result === undefined)
+      throw new HttpException('Could not find user', HttpStatus.NOT_FOUND);
+    return { userInfo:  result};
   }
 
   @UseGuards(JwtAuthGuard)
@@ -73,20 +79,20 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Post('blockedUser')
   async blockUser(@Request() req: any) {
-    this.userService.blockUser(req.user.name, req.body.username);
+    await this.userService.blockUser(req.user.name, req.body.username);
     return req.username + ' is now blocked';
   }
   
   @UseGuards(JwtAuthGuard)
   @Get('blockedUser')
   async getBlockedUsers(@Request() req: any) {
-    return { blockedUsers: this.userService.getBlockedUsers(req.user.name) };
+    return { blockedUsers: await this.userService.getBlockedUsers(req.user.name) };
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('blockedUser')
   async unblockUser(@Request() req: any) {
-    this.userService.unblockUser(req.user.name, req.body.username);
+    await this.userService.unblockUser(req.user.name, req.body.username);
     return req.username + ' is no longer blocked';
   }
 
