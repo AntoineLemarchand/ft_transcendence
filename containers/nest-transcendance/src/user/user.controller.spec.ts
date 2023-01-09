@@ -1,18 +1,36 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as testUtils from '../test.utils';
+import { INestApplication, Module } from '@nestjs/common';
+import * as testUtils from '../test.request.utils';
 import { AppModule } from '../app.module';
 import * as request from 'supertest';
+import { DataSource } from 'typeorm';
+import { setupDataSource } from '../test.databaseFake.utils';
+import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { User } from '../typeorm';
+import { UserService } from './user.service';
+import { ChannelService } from '../channel/channel.service';
+import { createTestModule } from '../test.module.utils';
 
 jest.mock('../broadcasting/broadcasting.gateway');
+jest.mock('@nestjs/typeorm', () => {
+  const original = jest.requireActual('@nestjs/typeorm');
+  original.TypeOrmModule.forRoot = jest
+    .fn()
+    .mockImplementation(({}) => fakeForRoot);
+  @Module({})
+  class fakeForRoot {}
+  return {
+    ...original,
+  };
+});
 
 let app: INestApplication;
+let dataSource: DataSource;
 
 beforeEach(async () => {
-  const module = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
-  app = module.createNestApplication();
+  dataSource = await setupDataSource();
+  app = await createTestModule(dataSource);
   await app.init();
 });
 
@@ -169,14 +187,15 @@ describe('Login', () => {
 
 describe('Blocking users', () => {
   //beforeEach(async () => {
-  
+
   //}
   it('should add user to the blockedUsers list', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
     testUtils.signinUser(app, 'Martin', 'yeye');
-    
+
     const result = await testUtils.blockUser(app, jwt, 'Martin');
-    const blockedUsersList = (await testUtils.getBlockedUsers(app, jwt)).body.blockedUsers;
+    const blockedUsersList = (await testUtils.getBlockedUsers(app, jwt)).body
+      .blockedUsers;
 
     expect(result.status).toBe(201);
     expect(blockedUsersList.length).toBe(1);
@@ -185,14 +204,14 @@ describe('Blocking users', () => {
   it('should remove user from the blockedUsers list', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
     testUtils.signinUser(app, 'Martin', 'yeye');
-    
+
     await testUtils.blockUser(app, jwt, 'Martin');
 
     const result = await testUtils.unblockUser(app, jwt, 'Martin');
-    const blockedUsersList = (await testUtils.getBlockedUsers(app, jwt)).body.blockedUsers;
+    const blockedUsersList = (await testUtils.getBlockedUsers(app, jwt)).body
+      .blockedUsers;
 
     expect(result.status).toBe(200);
     expect(blockedUsersList.length).toBe(0);
   });
 });
-

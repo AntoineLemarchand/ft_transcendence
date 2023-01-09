@@ -1,31 +1,47 @@
-import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as testUtils from '../test.utils';
-import { AppModule } from '../app.module';
+import { INestApplication, Module } from '@nestjs/common';
+import * as testUtils from '../test.request.utils';
 import * as request from 'supertest';
 import { Channel, ChannelType } from './channel.entities';
 import { UserService } from '../user/user.service';
 import { ChannelService } from './channel.service';
+import { DataSource } from 'typeorm';
+import { setupDataSource } from '../test.databaseFake.utils';
+import { createTestModule } from '../test.module.utils';
 
 jest.mock('../broadcasting/broadcasting.gateway');
+jest.mock('@nestjs/typeorm', () => {
+  const original = jest.requireActual('@nestjs/typeorm');
+  original.TypeOrmModule.forRoot = jest
+    .fn()
+    .mockImplementation(({}) => fakeForRoot);
+  @Module({})
+  class fakeForRoot {}
+  return {
+    ...original,
+  };
+});
 
 let app: INestApplication;
 let userService: UserService;
 let channelService: ChannelService;
+let dataSource: DataSource;
 
 beforeEach(async () => {
-  const module = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
-  app = module.createNestApplication();
-  userService = module.get<UserService>(UserService);
-  channelService = module.get<ChannelService>(ChannelService);
+  dataSource = await setupDataSource();
+  app = await createTestModule(dataSource);
+  userService = app.get<UserService>(UserService);
+  channelService = app.get<ChannelService>(ChannelService);
   await app.init();
 });
 
 describe('joining a channel', () => {
   it('should not be allowed to create a channel if the user is not logged in ', async () => {
-    const result = await testUtils.joinChannel(app, 'invalid token', 'newChannelName', 'default');
+    const result = await testUtils.joinChannel(
+      app,
+      'invalid token',
+      'newChannelName',
+      'default',
+    );
 
     expect(result.status).toBe(401);
   });
@@ -33,7 +49,12 @@ describe('joining a channel', () => {
   it('should return 201 and create a new channel if correct input is provided', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
 
-    const result = await testUtils.joinChannel(app, jwt, 'newChannelName', 'default');
+    const result = await testUtils.joinChannel(
+      app,
+      jwt,
+      'newChannelName',
+      'default',
+    );
 
     expect(result.status).toBe(201);
     expect(
@@ -43,7 +64,12 @@ describe('joining a channel', () => {
 
   it('should make nonempty password obligatory for others to join', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    await testUtils.createUserAndJoinToChannel(app, 'lambdaUserName', 'newChannelName', 'channelPassword');
+    await testUtils.createUserAndJoinToChannel(
+      app,
+      'lambdaUserName',
+      'newChannelName',
+      'channelPassword',
+    );
 
     const result = await testUtils.joinChannel(app, jwt, 'newChannelName', '');
 
@@ -52,17 +78,35 @@ describe('joining a channel', () => {
 
   it('should create a private Channel when joining first', async () => {
     const jwtCreator = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    await testUtils.joinChannel(app, jwtCreator, 'privateChannel', '', ChannelType.Private);
-    const jwtJoiner = (await testUtils.signinUser(app, 'outsider', 'password')).body.access_token;
+    await testUtils.joinChannel(
+      app,
+      jwtCreator,
+      'privateChannel',
+      '',
+      ChannelType.Private,
+    );
+    const jwtJoiner = (await testUtils.signinUser(app, 'outsider', 'password'))
+      .body.access_token;
 
-    const result = await testUtils.joinChannel(app, jwtJoiner, 'privateChannel', '');
+    const result = await testUtils.joinChannel(
+      app,
+      jwtJoiner,
+      'privateChannel',
+      '',
+    );
 
     expect(result.status).toBe(401);
   });
 
   it('should add people to private channels on invite', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    await testUtils.joinChannel(app, jwt, 'privateChannel', '', ChannelType.Private);
+    await testUtils.joinChannel(
+      app,
+      jwt,
+      'privateChannel',
+      '',
+      ChannelType.Private,
+    );
     await testUtils.signinUser(app, 'outsider', 'password');
 
     const result = await request(app.getHttpServer())
@@ -83,10 +127,22 @@ describe('joining a channel', () => {
 
   it('should return 401 when inviting people to private channels and not admin', async () => {
     const jwtCreator = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    await testUtils.joinChannel(app, jwtCreator, 'privateChannel', '', ChannelType.Private);
-    const jwtJoiner = (await testUtils.signinUser(app, 'outsider', 'password')).body.access_token;
+    await testUtils.joinChannel(
+      app,
+      jwtCreator,
+      'privateChannel',
+      '',
+      ChannelType.Private,
+    );
+    const jwtJoiner = (await testUtils.signinUser(app, 'outsider', 'password'))
+      .body.access_token;
 
-    const result = await testUtils.joinChannel(app, jwtJoiner, 'privateChannel', '');
+    const result = await testUtils.joinChannel(
+      app,
+      jwtJoiner,
+      'privateChannel',
+      '',
+    );
 
     expect(result.status).toBe(401);
   });
@@ -94,7 +150,12 @@ describe('joining a channel', () => {
   it('should return the new channel on join', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
 
-    const result = await testUtils.joinChannel(app, jwt, 'newChannelName', 'default');
+    const result = await testUtils.joinChannel(
+      app,
+      jwt,
+      'newChannelName',
+      'default',
+    );
 
     expect(result.status).toBe(201);
     expect(result.body.channel).toBeDefined();
@@ -104,17 +165,22 @@ describe('joining a channel', () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
 
     await testUtils.joinChannel(app, jwt, 'newChannelName', 'default');
-    const result = await testUtils.joinChannel(app, jwt, 'newChannelName', 'default');
+    const result = await testUtils.joinChannel(
+      app,
+      jwt,
+      'newChannelName',
+      'default',
+    );
 
     expect(result.status).toBe(409);
   });
 });
 
-
 async function createDirectMessage(
   callerModule: INestApplication,
   jwt: string,
-  targetUsername: string) {
+  targetUsername: string,
+) {
   return request(callerModule.getHttpServer())
     .post('/channel/join')
     .set('Authorization', 'Bearer ' + jwt)
@@ -191,14 +257,21 @@ describe('searching channels by name', () => {
       '',
     );
 
-    expect(matchingChannels.length).toEqual((await channelService.getChannels()).length);
+    expect(matchingChannels.length).toEqual(
+      (await channelService.getChannels()).length,
+    );
   });
 });
 
 describe('administrating a channel', () => {
   it('should return 401 if not authorized to execute administrator tasks', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    await testUtils.createUserAndJoinToChannel(app, 'bannedUserName', 'welcome', 'channelPassword');
+    await testUtils.createUserAndJoinToChannel(
+      app,
+      'bannedUserName',
+      'welcome',
+      'channelPassword',
+    );
 
     const response = await testUtils.banFromChannel(
       app,
@@ -211,8 +284,18 @@ describe('administrating a channel', () => {
   });
 
   it('should return 200 on success and remove member from channel', async () => {
-    const jwt = await testUtils.createUserAndJoinToChannel(app, 'Karsten', 'KarstensChannel', 'channelPassword');
-    await testUtils.createUserAndJoinToChannel(app, 'bannedUserName', 'KarstensChannel', 'channelPassword');
+    const jwt = await testUtils.createUserAndJoinToChannel(
+      app,
+      'Karsten',
+      'KarstensChannel',
+      'channelPassword',
+    );
+    await testUtils.createUserAndJoinToChannel(
+      app,
+      'bannedUserName',
+      'KarstensChannel',
+      'channelPassword',
+    );
 
     const response = await testUtils.banFromChannel(
       app,

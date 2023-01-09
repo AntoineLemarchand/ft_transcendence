@@ -3,7 +3,7 @@ import { Channel, Message } from './channel.entities';
 import { ChannelType } from './channel.entities';
 
 @Injectable()
-export class ChannelRepository {
+export class UserRepository {
   private channels = new Map<string, Channel>();
 
   constructor() {

@@ -1,21 +1,35 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as testUtils from '../test.utils';
+import { INestApplication, Module } from '@nestjs/common';
+import * as testUtils from '../test.request.utils';
 import { AppModule } from '../app.module';
 import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
-import * as request from 'supertest';
+import { DataSource } from 'typeorm';
+import { setupDataSource } from '../test.databaseFake.utils';
+import { User } from '../typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { createTestModule } from '../test.module.utils';
+
+jest.mock('../broadcasting/broadcasting.gateway');
+
+jest.mock('@nestjs/typeorm', () => {
+  const original = jest.requireActual('@nestjs/typeorm');
+  original.TypeOrmModule.forRoot = jest
+    .fn()
+    .mockImplementation(({}) => fakeForRoot);
+  @Module({})
+  class fakeForRoot {}
+  return {
+    ...original,
+  };
+});
 
 describe('AuthController', () => {
   let app: INestApplication;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
-    const module = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(BroadcastingGateway)
-      .useValue(jest.fn())
-      .compile();
-    app = module.createNestApplication();
+    dataSource = await setupDataSource();
+    app = await createTestModule(dataSource);
     await app.init();
   });
 

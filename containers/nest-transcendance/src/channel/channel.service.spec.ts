@@ -2,30 +2,34 @@ import { Test } from '@nestjs/testing';
 import { Channel, ChannelType, Message } from './channel.entities';
 import { ChannelService } from './channel.service';
 import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
-import { ChannelRepository } from './channel.repository.mock';
+import { UserRepository } from './channel.repository.mock';
 import { UserService } from '../user/user.service';
-import User from '../user/user.entities';
+import { User } from '../user/user.entities';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { setupDataSource } from '../test.databaseFake.utils';
+import { ChannelModule } from './channel.module';
 
 jest.spyOn(Channel.prototype, 'addMessage');
 jest.spyOn(BroadcastingGateway.prototype, 'emitMessage');
-// jest.spyOn(BroadcastingGateway.prototype, 'addUserToRoom');
 jest.mock('../broadcasting/broadcasting.gateway');
 
 let channelService: ChannelService;
-let channelRepository: ChannelRepository;
+let channelRepository: UserRepository;
 let broadcasting: BroadcastingGateway;
 let userService: UserService;
+let dataSource: DataSource;
+
 beforeEach(async () => {
+  dataSource = await setupDataSource();
   const module = await Test.createTestingModule({
-    providers: [
-      ChannelService,
-      ChannelRepository,
-      BroadcastingGateway,
-      UserService,
-    ],
-  }).compile();
+    imports: [ChannelModule],
+  })
+    .overrideProvider(getRepositoryToken(User))
+    .useValue(dataSource.getRepository(User))
+    .compile();
   channelService = module.get<ChannelService>(ChannelService);
-  channelRepository = module.get<ChannelRepository>(ChannelRepository);
+  channelRepository = module.get<UserRepository>(UserRepository);
   broadcasting = module.get<BroadcastingGateway>(BroadcastingGateway);
   userService = module.get<UserService>(UserService);
 });
@@ -137,13 +141,13 @@ describe('direct messaging', () => {
   });
 
   it('should make the target user an admin', async () => {
-      await channelService.createDirectMessageChannelFor('Thomas', 'HisFriend');
+    await channelService.createDirectMessageChannelFor('Thomas', 'HisFriend');
 
-      expect(
-        (await channelService.getChannelByName('Thomas_HisFriend'))?.isAdmin(
-          'HisFriend',
-        ),
-      ).toBeTruthy();
+    expect(
+      (await channelService.getChannelByName('Thomas_HisFriend'))?.isAdmin(
+        'HisFriend',
+      ),
+    ).toBeTruthy();
   });
 });
 

@@ -1,14 +1,14 @@
-import { ChannelRepository } from './channel.repository.mock';
+import { UserRepository } from './channel.repository.mock';
 import { Test } from '@nestjs/testing';
 import { Message } from './channel.entities';
 
-let channelRepository: ChannelRepository;
+let channelRepository: UserRepository;
 
 beforeEach(async () => {
   const module = await Test.createTestingModule({
-    providers: [ChannelRepository],
+    providers: [UserRepository],
   }).compile();
-  channelRepository = module.get<ChannelRepository>(ChannelRepository);
+  channelRepository = module.get<UserRepository>(UserRepository);
   channelRepository.clear();
 });
 

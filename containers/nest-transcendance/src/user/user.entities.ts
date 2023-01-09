@@ -1,10 +1,25 @@
-import { Channel } from '../channel/channel.entities';
+import { Column, Entity, PrimaryColumn } from 'typeorm';
 
-export default class User {
-  private friends: string[] = [];
-  private blockedUsers: string[] = [];
-  private channelNames: string[] = ['welcome'];
-  constructor(private name: string, private password: string) {}
+@Entity()
+export class User {
+  @Column('text', { array: true })
+  public friends: string[] = [];
+  @Column('text', { array: true })
+  public blockedUsers: string[] = [];
+  @Column('text', { array: true })
+  public channelNames: string[] = ['welcome'];
+  @PrimaryColumn()
+  public name: string;
+  @Column({
+    nullable: false,
+    default: '',
+  })
+  public password: string;
+
+  constructor(name: string, password: string) {
+    this.password = password;
+    this.name = name;
+  }
 
   getName() {
     return this.name;
@@ -52,7 +67,7 @@ export default class User {
       (tmpName) => tmpName != channelName,
     );
   }
-  
+
   getBlockedUsers() {
     return this.blockedUsers;
   }

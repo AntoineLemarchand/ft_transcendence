@@ -7,7 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { environment } from '../utils/environmentParser';
 import { JwtStrategy } from './auth.jwt.strategy';
 import { AuthController } from './auth.controller';
-import User from '../user/user.entities';
+import { User } from '../user/user.entities';
 import { WsGuard } from './websocket.auth.guard';
 import { ChannelModule } from '../channel/channel.module';
 
@@ -17,7 +17,6 @@ import { ChannelModule } from '../channel/channel.module';
     forwardRef(() => UserModule),
     PassportModule,
     forwardRef(() => ChannelModule),
-    User,
     JwtModule.register({
       secret: environment.JWT_SECRET_PASSWORD,
       signOptions: { expiresIn: '60s' },

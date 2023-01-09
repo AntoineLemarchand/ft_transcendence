@@ -1,8 +1,10 @@
 /* eslint-disable prettier/prettier */
 import { forwardRef, HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
-import User from './user.entities';
+import { User } from './user.entities';
 import { ChannelService } from '../channel/channel.service';
 import { Channel } from '../channel/channel.entities';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class UserService {
@@ -10,7 +12,9 @@ export class UserService {
 
 	constructor(
 		@Inject(forwardRef(() => ChannelService))
-		private channelService: ChannelService) {
+		private channelService: ChannelService,
+    @InjectRepository(User) private readonly userRepository: Repository<User>)
+{
 		this.users = [new User('Thomas', 'test')]
 	}
 
@@ -22,8 +26,9 @@ export class UserService {
 		return undefined;
   }
 
-  createUser(user: User) {
+  async createUser(user: User) {
     this.users.push(user);
+    await this.userRepository.save(user);
   }
 
   deleteUser(name: string) {
@@ -87,8 +92,9 @@ export class UserService {
 		return user.removeChannelName(channelName);
 	}
 
-	getAllUsernames(): string[] {
-		return (this.users.map((user) => user.getName()))
+	async getAllUsernames(){
+    const userlist = await this.userRepository.find();
+    return userlist;
 	}
 
 	async findMatching(regexSearchString: string): Promise<string[]> {

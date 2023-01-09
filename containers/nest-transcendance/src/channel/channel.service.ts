@@ -6,14 +6,14 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Channel, ChannelType, Message } from './channel.entities';
-import { ChannelRepository } from './channel.repository.mock';
+import { UserRepository } from './channel.repository.mock';
 import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
 import { UserService } from '../user/user.service';
 
 @Injectable()
 export class ChannelService {
   constructor(
-    private channelRepository: ChannelRepository,
+    private channelRepository: UserRepository,
     private broadcastingGateway: BroadcastingGateway,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
