@@ -27,6 +27,7 @@ import entities from './typeorm';
       password: environment.DB_PASSWORD,
       database: environment.DB_NAME,
       entities: entities,
+      synchronize: true,
     }),
     RouterModule.register([
       {

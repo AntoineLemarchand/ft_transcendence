@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { User } from './user.entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { setupDataSource } from '../test.databaseFake.utils';
+import { setupDataSource, TestDatabase } from '../test.databaseFake.utils';
 import { UserService } from './user.service';
 import { ChannelModule } from '../channel/channel.module';
 import { INestApplication } from '@nestjs/common';
@@ -14,16 +14,24 @@ jest.spyOn(BroadcastingGateway.prototype, 'emitMessage');
 jest.mock('../broadcasting/broadcasting.gateway');
 
 let userService: UserService;
-let dataSource: DataSource;
 let app: INestApplication;
+let dataSource: DataSource;
+let testDataBase: TestDatabase;
+
+beforeAll(async () => {
+  testDataBase = await setupDataSource();
+  dataSource = testDataBase.dataSource;
+});
 
 beforeEach(async () => {
-  dataSource = await setupDataSource();
+  testDataBase.reset();
   const module = await Test.createTestingModule({
     imports: [ChannelModule],
   })
     .overrideProvider(getRepositoryToken(User))
     .useValue(dataSource.getRepository(User))
+    .overrideProvider(getRepositoryToken(Channel))
+    .useValue(dataSource.getRepository(Channel))
     .compile();
   app = module.createNestApplication();
   userService = app.get<UserService>(UserService);

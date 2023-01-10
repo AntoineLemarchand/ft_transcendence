@@ -83,7 +83,7 @@ export class ChannelController {
   @UseGuards(JwtAuthGuard)
   @Get('getMatchingNames/:regexString')
   async findMatching(@Param() params: any) {
-    const matchingChannels = await this.channelService.findMatching(
+    const matchingChannels = await this.channelService.findMatchingNames(
       params.regexString,
     );
     return { channels: matchingChannels };
@@ -92,7 +92,7 @@ export class ChannelController {
   @UseGuards(JwtAuthGuard)
   @Get('getMatchingNames')
   async findAllChannelNames(@Request() req: any) {
-    const matchingChannels = await this.channelService.findMatching('');
+    const matchingChannels = await this.channelService.findMatchingNames('');
     return { channels: matchingChannels };
   }
 

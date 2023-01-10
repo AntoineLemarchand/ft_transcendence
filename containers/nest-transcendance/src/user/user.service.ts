@@ -24,6 +24,7 @@ export class UserService {
 
   async createUser(user: User) {
     await this.userRepository.save(user);
+    await this.channelService.joinChannel(user.getName(), 'welcome', '');
   }
 
   async deleteUser(name: string) {
@@ -66,7 +67,7 @@ export class UserService {
 		const user = await this.getUser(username) as User;
 		const result: Channel[] = [];
 		for (const channelName of user.getChannelNames())
-			result.push(await this.channelService.getChannelByName(channelName));
+			result.push(await this.channelService.getChannelByName(channelName) as Channel);
 		return result;
 	}
 

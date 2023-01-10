@@ -6,37 +6,46 @@ import { UserService } from '../user/user.service';
 import { User } from '../user/user.entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { setupDataSource } from '../test.databaseFake.utils';
+import { setupDataSource, TestDatabase } from '../test.databaseFake.utils';
 import { ChannelModule } from './channel.module';
-import { UserRepository } from './channel.repository.mock';
 
 jest.spyOn(Channel.prototype, 'addMessage');
 jest.spyOn(BroadcastingGateway.prototype, 'emitMessage');
 jest.mock('../broadcasting/broadcasting.gateway');
 
 let channelService: ChannelService;
-let channelRepository: UserRepository;
 let broadcasting: BroadcastingGateway;
 let userService: UserService;
 let dataSource: DataSource;
+let testDataBase: TestDatabase;
+
+beforeAll(async () => {
+  testDataBase = await setupDataSource();
+  dataSource = testDataBase.dataSource;
+});
 
 beforeEach(async () => {
-  dataSource = await setupDataSource();
+  testDataBase.reset();
   const module = await Test.createTestingModule({
     imports: [ChannelModule],
   })
     .overrideProvider(getRepositoryToken(User))
     .useValue(dataSource.getRepository(User))
+    .overrideProvider(getRepositoryToken(Channel))
+    .useValue(dataSource.getRepository(Channel))
     .compile();
   channelService = module.get<ChannelService>(ChannelService);
-  channelRepository = module.get<UserRepository>(UserRepository);
   broadcasting = module.get<BroadcastingGateway>(BroadcastingGateway);
   userService = module.get<UserService>(UserService);
   await userService.createUser(new User('Thomas', 'test'));
+  await userService.createUser(new User('admin', 'admin'));
+  await channelService.joinChannel('admin', 'welcom', '');
+  await channelService.joinChannel('admin', 'wlcm', '');
+  await channelService.joinChannel('admin', 'ab', '');
 });
 
-function initChannelWithMessage() {
-  channelRepository.create('newChannel', 'admin', '');
+async function initChannelWithMessage() {
+  await channelService.joinChannel('admin', 'newChannel', '');
   const messageToBeSent = new Message();
   messageToBeSent.channel = 'newChannel';
   return messageToBeSent;
@@ -44,16 +53,16 @@ function initChannelWithMessage() {
 
 describe('Sending a message', () => {
   it('should save the message in the repository', async () => {
-    const messageToBeSent = initChannelWithMessage();
+    const messageToBeSent = await initChannelWithMessage();
 
     channelService.sendMessage(messageToBeSent);
 
-    const result = await channelRepository.findOne('newChannel');
+    const result = await channelService.getChannelByName('newChannel');
     expect(result.addMessage).toHaveBeenCalled();
   });
 
   it('should emit the message as event on the gateway', async () => {
-    const messageToBeSent = initChannelWithMessage();
+    const messageToBeSent = await initChannelWithMessage();
 
     await channelService.sendMessage(messageToBeSent);
 
@@ -106,10 +115,12 @@ describe('Joining a channel', () => {
 describe('direct messaging', () => {
   beforeEach(async () => {
     await userService.createUser(new User('HisFriend', ''));
+    await userService.createUser(new User('Thomas', ''));
   });
 
   afterEach(async () => {
     await userService.deleteUser('HisFriend');
+    await userService.deleteUser('Thomas');
   });
 
   it('should only be possible to use underscores in direct message channels', async () => {
@@ -144,11 +155,8 @@ describe('direct messaging', () => {
   it('should make the target user an admin', async () => {
     await channelService.createDirectMessageChannelFor('Thomas', 'HisFriend');
 
-    expect(
-      (await channelService.getChannelByName('Thomas_HisFriend'))?.isAdmin(
-        'HisFriend',
-      ),
-    ).toBeTruthy();
+    const result = await channelService.getChannelByName('Thomas_HisFriend');
+    expect(result?.isAdmin('HisFriend')).toBeTruthy();
   });
 });
 
@@ -172,9 +180,9 @@ describe('Administrating a channel', () => {
     await channelService.makeAdmin('Thomas', 'randomUser', 'channelName');
 
     expect(
-      (await channelService.getChannelByName('channelName')).isAdmin(
-        'randomUser',
-      ),
+      (
+        (await channelService.getChannelByName('channelName')) as Channel
+      ).isAdmin('randomUser'),
     ).toBeTruthy();
   });
 
@@ -187,11 +195,7 @@ describe('Administrating a channel', () => {
     );
 
     await expect(() =>
-      channelService.joinChannel(
-        'bannedUserName',
-        'channelName',
-        'channelPassword',
-      ),
+      channelService.joinChannel('bannedUserName', 'channelName', ''),
     ).rejects.toThrow();
   });
 
@@ -287,9 +291,9 @@ describe('Administrating a channel', () => {
 
     await channelService.inviteToChannel('Thomas', 'randomUser', 'channelName');
     expect(
-      (await channelService.getChannelByName('channelName')).isUserBanned(
-        'randomUser',
-      ),
+      (
+        (await channelService.getChannelByName('channelName')) as Channel
+      ).isUserBanned('randomUser'),
     ).toBeFalsy();
   });
 });

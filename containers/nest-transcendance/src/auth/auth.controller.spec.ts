@@ -4,7 +4,7 @@ import * as testUtils from '../test.request.utils';
 import { AppModule } from '../app.module';
 import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
 import { DataSource } from 'typeorm';
-import { setupDataSource } from '../test.databaseFake.utils';
+import { setupDataSource, TestDatabase } from '../test.databaseFake.utils';
 import { User } from '../typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { createTestModule } from '../test.module.utils';
@@ -26,11 +26,17 @@ jest.mock('@nestjs/typeorm', () => {
 
 describe('AuthController', () => {
   let app: INestApplication;
-  let dataSource: DataSource;
   let userService: UserService;
+  let dataSource: DataSource;
+  let testDataBase: TestDatabase;
+
+  beforeAll(async () => {
+    testDataBase = await setupDataSource();
+    dataSource = testDataBase.dataSource;
+  });
 
   beforeEach(async () => {
-    dataSource = await setupDataSource();
+    testDataBase.reset();
     app = await createTestModule(dataSource);
     await app.init();
     userService = app.get<UserService>(UserService);

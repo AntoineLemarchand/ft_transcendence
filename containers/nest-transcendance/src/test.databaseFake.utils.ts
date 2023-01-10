@@ -1,10 +1,21 @@
-import { DataType, newDb } from 'pg-mem';
+import { DataType, IBackup, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 import { v4 } from 'uuid';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import entities from './typeorm';
 import { Module } from '@nestjs/common';
+
+export class TestDatabase {
+  private backup: IBackup;
+  constructor(public dataSource: DataSource, public dataBase: IMemoryDb) {
+    this.backup = dataBase.backup();
+  }
+
+  reset() {
+    this.backup.restore();
+  }
+}
 
 export const setupDataSource = async () => {
   const db = newDb({
@@ -40,7 +51,7 @@ export const setupDataSource = async () => {
   await ds.initialize();
   await ds.synchronize();
 
-  return ds;
+  return new TestDatabase(ds, db);
 };
 
 export function disableRealDatabaseConnection() {

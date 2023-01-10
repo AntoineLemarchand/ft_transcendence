@@ -6,23 +6,25 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Channel, ChannelType, Message } from './channel.entities';
-import { UserRepository } from './channel.repository.mock';
 import { BroadcastingGateway } from '../broadcasting/broadcasting.gateway';
 import { UserService } from '../user/user.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Like, Repository } from 'typeorm';
 
 @Injectable()
 export class ChannelService {
   constructor(
-    private channelRepository: UserRepository,
+    @InjectRepository(Channel)
+    private readonly channelRepository: Repository<Channel>,
     private broadcastingGateway: BroadcastingGateway,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
   ) {}
 
   async sendMessage(message: Message): Promise<void> {
-    await this.channelRepository.findOne(message.channel).then((channel) => {
-      channel.addMessage(message);
-    });
+    const channel = await await this.getChannelByName(message.channel);
+    await channel.addMessage(message);
+    await this.channelRepository.save(channel);
     //todo: find syntax to differentiate between messages and game states etc
     await this.broadcastingGateway.emitMessage(message.channel, message);
   }
@@ -33,26 +35,28 @@ export class ChannelService {
     password: string,
     channelType: ChannelType,
   ): Promise<Channel> {
-    return await this.channelRepository
-      .create(channelName, ownername, password, channelType)
-      .catch(() => {
-        throw new HttpException(
-          'This channel exists already',
-          HttpStatus.CONFLICT,
-        );
-      });
+    const result = new Channel(channelName, ownername, password, channelType);
+    await this.channelRepository.save(result);
+    return result;
   }
 
-  async findMatching(regexSearchString: string): Promise<string[]> {
-    return await this.channelRepository.findMatching(regexSearchString);
+  async findMatchingNames(regexSearchString: string): Promise<string[]> {
+    const matchingChannels = await this.channelRepository.findBy({
+      channelName: Like(`%${regexSearchString}%`),
+    });
+    return await matchingChannels.map((channel) => channel.getName());
   }
 
   async getChannels(): Promise<Channel[]> {
-    return await this.channelRepository.findAll();
+    return await this.channelRepository.find();
   }
 
   async getChannelByName(channelName: string) {
-    return await this.channelRepository.findOne(channelName);
+    const result = await this.channelRepository.findOneBy({
+      channelName: channelName,
+    });
+    if (result) return result;
+    else return Promise.reject(new Error('No such channel'));
   }
 
   async joinChannel(
@@ -62,14 +66,16 @@ export class ChannelService {
     channelType = ChannelType.Normal,
   ): Promise<Channel> {
     checkName();
-    const channel = await this.getChannelByName(channelName).catch(async () => {
-      return await this.addChannel(
-        channelName,
-        userName,
-        channelPassword,
-        channelType,
-      );
-    });
+    const channel = (await this.getChannelByName(channelName).catch(
+      async () => {
+        return await this.addChannel(
+          channelName,
+          userName,
+          channelPassword,
+          channelType,
+        );
+      },
+    )) as Channel;
     await isJoiningAllowed();
     return await this.addUserToChannel(userName, channelName, channel);
 
@@ -114,7 +120,7 @@ export class ChannelService {
     bannedUserName: string,
     channelName: string,
   ): Promise<void> {
-    const channel: Channel = await this.channelRepository.findOne(channelName);
+    const channel: Channel = await this.getChannelByName(channelName);
     if (channel.isAdmin(usernameOfExecutor) == false)
       throw new Error('This user is not an admin');
     channel.banUser(bannedUserName);
@@ -126,11 +132,11 @@ export class ChannelService {
     invitedName: string,
     channelName: string,
   ) {
-    const channel = await this.getChannelByName(channelName).catch(
+    const channel = (await this.getChannelByName(channelName).catch(
       (exception) => {
         throw new HttpException(exception, HttpStatus.NOT_FOUND);
       },
-    );
+    )) as Channel;
     if (channel.isAdmin(executorName) == false)
       throw new HttpException(
         'only admins can invite',
@@ -154,21 +160,18 @@ export class ChannelService {
     await this.makeAdmin(invitingUsername, invitedUsername, channelName);
   }
 
-  test(){
-
-  }
-
   async makeAdmin(
     executor: string,
     adminCandidateUsername: string,
     channelName: string,
   ) {
-    const channel = await this.channelRepository.findOne(channelName);
+    const channel = await this.getChannelByName(channelName);
     if (channel.isAdmin(executor) == false)
       throw new HttpException(
         'only admins can make other user admins',
         HttpStatus.UNAUTHORIZED,
       );
     channel.addAdmin(adminCandidateUsername);
+    await this.channelRepository.save(channel);
   }
 }

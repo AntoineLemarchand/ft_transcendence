@@ -5,7 +5,7 @@ import { Channel, ChannelType } from './channel.entities';
 import { UserService } from '../user/user.service';
 import { ChannelService } from './channel.service';
 import { DataSource } from 'typeorm';
-import { setupDataSource } from '../test.databaseFake.utils';
+import { setupDataSource, TestDatabase } from '../test.databaseFake.utils';
 import { createTestModule } from '../test.module.utils';
 import { User } from '../user/user.entities';
 
@@ -26,16 +26,21 @@ let app: INestApplication;
 let userService: UserService;
 let channelService: ChannelService;
 let dataSource: DataSource;
+let testDataBase: TestDatabase;
 
+beforeAll(async () => {
+  testDataBase = await setupDataSource();
+  dataSource = testDataBase.dataSource;
+});
 beforeEach(async () => {
-  dataSource = await setupDataSource();
+  testDataBase.reset();
   app = await createTestModule(dataSource);
   userService = app.get<UserService>(UserService);
   channelService = app.get<ChannelService>(ChannelService);
   await app.init();
+  await userService.createUser(new User('admin', 'admin'));
   await userService.createUser(new User('Thomas', 'test'));
 });
-
 
 describe('joining a channel', () => {
   it('should not be allowed to create a channel if the user is not logged in ', async () => {
@@ -269,12 +274,6 @@ describe('searching channels by name', () => {
 describe('administrating a channel', () => {
   it('should return 401 if not authorized to execute administrator tasks', async () => {
     const jwt = await testUtils.getLoginToken(app, 'Thomas', 'test');
-    await testUtils.createUserAndJoinToChannel(
-      app,
-      'bannedUserName',
-      'welcome',
-      'channelPassword',
-    );
 
     const response = await testUtils.banFromChannel(
       app,

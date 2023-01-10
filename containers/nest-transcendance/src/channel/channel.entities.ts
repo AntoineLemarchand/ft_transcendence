@@ -1,4 +1,6 @@
 //todo: how to prevent duplication with react?
+import { Column, Entity, PrimaryColumn } from 'typeorm';
+
 export class Message {
   sender: string;
   content: string;
@@ -16,17 +18,36 @@ export enum ChannelType {
   DirectMesage,
 }
 
+@Entity()
 export class Channel {
-  messages: Message[];
-  private admins: string[];
-  private bannedUsers: string[];
+  @Column('jsonb')
+  public messages: Message[];
+  @Column('text', { array: true })
+  public admins: string[];
+  @Column('text', { array: true })
+  public bannedUsers: string[];
+  @PrimaryColumn()
+  public channelName: string;
+  @Column({
+    nullable: false,
+    default: '',
+    type: 'varchar',
+  })
+  public password = '';
+  @Column({
+    type: 'jsonb',
+  })
+  public type = ChannelType.Normal;
 
   constructor(
-    private channelName: string,
+    channelName: string,
     creatorUserName: string,
-    private password = '',
-    private type = ChannelType.Normal,
+    password = '',
+    type = ChannelType.Normal,
   ) {
+    this.type = type;
+    this.password = password;
+    this.channelName = channelName;
     this.messages = [];
     this.admins = [creatorUserName];
     this.bannedUsers = [];

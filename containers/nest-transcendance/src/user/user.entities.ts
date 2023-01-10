@@ -7,7 +7,7 @@ export class User {
   @Column('text', { array: true })
   public blockedUsers: string[] = [];
   @Column('text', { array: true })
-  public channelNames: string[] = ['welcome'];
+  public channelNames: string[] = [];
   @PrimaryColumn()
   public name: string;
   @Column({
